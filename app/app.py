@@ -1,27 +1,21 @@
 from prometheus_client import MetricsHandler, Gauge
 import logging
 import os
-import platform
 import socket
 import threading
-import uuid
 from datetime import datetime
-from flask import Flask, request, Response
-import requests
 from http.server import HTTPServer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-app = Flask(__name__)
-
-version = "0.6.25"
+version = "0.7.1"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
 resend_endpoint = os.environ.get('RESEND_DEST')
 resend_bool = os.getenv("RESENDING", 'False').lower() in ('true', '1', 't')
 
-prom_port = os.environ.get('PROM_PORT', 9110)
+prom_port = int(os.environ.get('PROM_PORT', 9110))
 
 
 class PrometheusEndpointServer(threading.Thread):
@@ -35,8 +29,9 @@ class PrometheusEndpointServer(threading.Thread):
 
 def start_prometheus_server():
     try:
-        httpd = HTTPServer(("0.0.0.0", int(prom_port)), MetricsHandler)
-    except (OSError, socket.error):
+        httpd = HTTPServer(("0.0.0.0", prom_port), MetricsHandler)
+    except (OSError, socket.error) as e:
+        logging.error("Failed to start Prometheus server: %s", str(e))
         return
 
     thread = PrometheusEndpointServer(httpd)
@@ -45,38 +40,61 @@ def start_prometheus_server():
     logging.info("Exporting Prometheus /metrics/ on port %s", prom_port)
 
 
-start_prometheus_server()
+def listen_and_relay(resend_dest, resend_port):
+    listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen_socket.bind(('0.0.0.0', int(os.environ.get('LISTEN_PORT', 8082))))
+    listen_socket.listen(1)
+
+    logging.info("Listening on port 8082 and resending to %s:%s", resend_dest, resend_port)
+
+    while True:
+        client_socket, client_address = listen_socket.accept()
+        logging.info("Socket open on {}".format(client_socket))
+        logging.info("Accepted connection from %s:%s", client_address[0], client_address[1])
+
+        received_data = client_socket.recv(4096)
+
+        received_data_str = received_data.decode('utf-8')
+
+        parsed_data = received_data_str.split('\n')
+
+        logging.info("Parsed data:")
+        for line in parsed_data:
+            logging.info(line)
+
+        for key, value in parse_string_to_dict(str(parsed_data[6:])).items():
+            logging.info("{}:{}".format(key,value))
+            if key.startswith("temp") and key.endswith("f"):
+                celsius = fahrenheit_to_celsius(float(value))
+                key = key[:-1] + 'c'
+                update_gauge("ecowitt_{}".format(key), celsius)
+            elif key in skip_list:
+                continue
+            else:
+                update_gauge("ecowitt_{}".format(key), float(value))
+
+        if resend_bool:
+            logging.info("Resending to: {}:{}".format(resend_dest, resend_port))
+            send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            send_socket.connect((resend_dest, resend_port))
+            logging.info("Sending received data to %s:%s", resend_dest, resend_port)
+
+            send_socket.sendall(received_data)
+
+            send_socket.close()
+
+        client_socket.close()
 
 
-@app.route('/version')
-def versioning():
-    return f'Ecowitt Eventbridge Version: {version}\n'
+def parse_string_to_dict(input_string):
+    datapoints = {}
+    pairs = input_string.replace("[","").replace("'","").replace("]","").split('&')
 
+    for pair in pairs:
+        key, value = pair.split('=')
+        datapoints[key] = value
 
-@app.route('/')
-def system_status():
-    flask_status = get_flask_status()
-    # Add more status checks or information here
-    return f'System Status\nFlask Status: {flask_status}\n'
-
-
-@app.route('/data/report/', methods=['POST'])
-def ecowitt_listener():
-    logging.info("Data Received from device")
-    if resend_bool:
-        resend_data(str(request.get_data()))
-
-    for key, value in request.form.items():
-        if key.startswith("temp") and key.endswith("f"):
-            celsius = fahrenheit_to_celsius(float(value))
-            key = key[:-1] + 'c'
-            update_gauge("ecowitt_{}".format(key), celsius)
-        elif key in skip_list:
-            continue
-        else:
-            update_gauge("ecowitt_{}".format(key), float(value))
-
-    return 'OK'
+    return datapoints
 
 
 def update_gauge(key, value):
@@ -85,45 +103,13 @@ def update_gauge(key, value):
     gauges[key].set(value)
 
 
-def get_mac_address():
-    mac = uuid.getnode()
-    mac_address = ':'.join(("%012X" % mac)[i:i+2] for i in range(0, 12, 2))
-    return mac_address
-
-
-def get_flask_status():
-    python_version = platform.python_version()  # Python version
-    flask_mode = 'Development mode' if app.debug else 'Production mode'  # Flask mode (debug or production)
-    host = request.host  # Host address
-    port = request.host.split(':')[1]  # Port number
-
-    # Return a dictionary with the status information
-    return {
-        'Python Version': python_version,
-        'Flask Mode': flask_mode,
-        'Host': host,
-        'Port': port,
-        'MAC': get_mac_address()
-    }
-
-
 def fahrenheit_to_celsius(fahrenheit):
     celsius = (fahrenheit - 32) * 5 / 9
     return celsius
 
 
-def resend_data(data):
-    # Send a POST request to the resend endpoint with the data
-
-    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    response = requests.post(f"http://{resend_endpoint}:{os.environ.get('RESEND_PORT', '8080')}/data/report/", data=data, headers=headers)
-    if response.status_code == 200 or response.status_code == 201:
-        logging.info('Data successfully resent to the destination endpoint - {}'.format(response.status_code))
-    else:
-        logging.info('Failed to resend data to the destination endpoint - {} - {}'.format(response.status_code, response.content))
-    response.close()
-
-
 if __name__ == '__main__':
-    app.run(port=os.environ.get('LISTEN_PORT'))
+    logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
+    start_prometheus_server()
+    listen_and_relay(str(os.environ.get("RESEND_DEST")), int(os.environ.get("RESEND_PORT", 8080)))
 
