@@ -8,7 +8,7 @@ from http.server import HTTPServer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.7.1"
+version = "0.7.1.1"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -68,6 +68,10 @@ def listen_and_relay(resend_dest, resend_port):
                 celsius = fahrenheit_to_celsius(float(value))
                 key = key[:-1] + 'c'
                 update_gauge("ecowitt_{}".format(key), celsius)
+            elif key.startswith("barom") and key.endswith("in"):
+                hpa = in_to_hpa(float(value))
+                key = key[:-2] + 'hpa'
+                update_gauge("ecowitt_{}".format(key), hpa)
             elif key in skip_list:
                 continue
             else:
@@ -107,6 +111,9 @@ def fahrenheit_to_celsius(fahrenheit):
     celsius = (fahrenheit - 32) * 5 / 9
     return celsius
 
+def in_to_hpa(ins):
+    hpa = ins * 33.6585
+    return hpa
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
