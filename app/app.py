@@ -42,6 +42,7 @@ def start_prometheus_server():
 
 def listen_and_relay(resend_dest, resend_port):
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listen_socket.bind(('0.0.0.0', int(os.environ.get('LISTEN_PORT', 8082))))
     listen_socket.listen(1)
 
@@ -80,6 +81,7 @@ def listen_and_relay(resend_dest, resend_port):
         if resend_bool:
             logging.info("Resending to: {}:{}".format(resend_dest, resend_port))
             send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             send_socket.connect((resend_dest, resend_port))
             logging.info("Sending received data to %s:%s", resend_dest, resend_port)
 
