@@ -6,9 +6,10 @@ import threading
 from datetime import datetime
 from http.server import HTTPServer
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.7.1.2"
+version = "0.7.2"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -43,15 +44,18 @@ def start_prometheus_server():
 def listen_and_relay(resend_dest, resend_port):
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listen_socket.bind(('0.0.0.0', int(os.environ.get('LISTEN_PORT', 8082))))
+    listen_port_final = os.environ.get('LISTEN_PORT', 8082)
+    listen_socket.bind(('0.0.0.0', int(listen_port_final)))
     listen_socket.listen(1)
 
-    logging.info("Listening on port 8082 and resending to %s:%s", resend_dest, resend_port)
+    logging.info("Listening on port {} and resending to {}:{}".format(
+        listen_port_final, resend_dest, resend_port))
 
     while True:
         client_socket, client_address = listen_socket.accept()
         logging.info("Socket open on {}".format(client_socket))
-        logging.info("Accepted connection from %s:%s", client_address[0], client_address[1])
+        logging.info("Accepted connection from %s:%s",
+                     client_address[0], client_address[1])
 
         received_data = client_socket.recv(4096)
 
@@ -64,7 +68,7 @@ def listen_and_relay(resend_dest, resend_port):
             logging.info(line)
 
         for key, value in parse_string_to_dict(str(parsed_data[6:])).items():
-            logging.info("{}:{}".format(key,value))
+            logging.info("{}:{}".format(key, value))
             if key.startswith("temp") and key.endswith("f"):
                 celsius = fahrenheit_to_celsius(float(value))
                 key = key[:-1] + 'c'
@@ -79,11 +83,13 @@ def listen_and_relay(resend_dest, resend_port):
                 update_gauge("ecowitt_{}".format(key), float(value))
 
         if resend_bool:
-            logging.info("Resending to: {}:{}".format(resend_dest, resend_port))
+            logging.info("Resending to: {}:{}".format(
+                resend_dest, resend_port))
             send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             send_socket.connect((resend_dest, resend_port))
-            logging.info("Sending received data to %s:%s", resend_dest, resend_port)
+            logging.info("Sending received data to %s:%s",
+                         resend_dest, resend_port)
 
             send_socket.sendall(received_data)
 
@@ -94,7 +100,8 @@ def listen_and_relay(resend_dest, resend_port):
 
 def parse_string_to_dict(input_string):
     datapoints = {}
-    pairs = input_string.replace("[","").replace("'","").replace("]","").split('&')
+    pairs = input_string.replace("[", "").replace(
+        "'", "").replace("]", "").split('&')
 
     for pair in pairs:
         key, value = pair.split('=')
@@ -113,12 +120,14 @@ def fahrenheit_to_celsius(fahrenheit):
     celsius = (fahrenheit - 32) * 5 / 9
     return celsius
 
+
 def in_to_hpa(ins):
     hpa = ins * 33.6585
     return hpa
 
+
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
     start_prometheus_server()
-    listen_and_relay(str(os.environ.get("RESEND_DEST")), int(os.environ.get("RESEND_PORT", 8080)))
-
+    listen_and_relay(str(os.environ.get("RESEND_DEST")),
+                     int(os.environ.get("RESEND_PORT", 8080)))

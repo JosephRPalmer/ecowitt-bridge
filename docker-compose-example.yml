@@ -1,0 +1,18 @@
+version: "3.3"
+
+services:
+  ecowitt-eventbridge:
+    image: josephrpalmer/ecowitt-eventbridge
+    container_name: ecowitt-eventbridge
+    network_mode: bridge
+    restart: always
+    environment:
+      - LISTEN_PORT=8082
+      - PROM_PORT=9110
+      - RESEND_DEST=10.10.1.233
+      - RESEND_PORT=8080
+      - RESENDING=1
+      - LISTEN_ADDR=10.10.1.233
+    ports:
+      - "8082:8082"
+      - "9110:9110"
