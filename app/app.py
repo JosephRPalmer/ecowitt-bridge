@@ -1,4 +1,5 @@
 from prometheus_client import MetricsHandler, Gauge
+import asyncio
 import logging
 import os
 import socket
@@ -9,7 +10,7 @@ from http.server import HTTPServer
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.7.2"
+version = "0.8.0"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -85,17 +86,30 @@ def listen_and_relay(resend_dest, resend_port):
         if resend_bool:
             logging.info("Resending to: {}:{}".format(
                 resend_dest, resend_port))
-            send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            send_socket.connect((resend_dest, resend_port))
-            logging.info("Sending received data to %s:%s",
-                         resend_dest, resend_port)
-
-            send_socket.sendall(received_data)
-
-            send_socket.close()
+            asyncio.run(resending_async(resend_dest, resend_port, received_data))
 
         client_socket.close()
+
+async def resending_async(resend_dest, resend_port, received_data):
+    try:
+        send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        send_socket.connect((resend_dest, resend_port))
+        logging.info("Sending received data to %s:%s", resend_dest, resend_port)
+
+        send_socket.sendall(received_data)
+
+    except socket.error as e:
+        logging.error("Socket error: %s", str(e))
+
+    except Exception as e:
+        logging.error("An unexpected error occurred: %s", str(e))
+
+    finally:
+        if send_socket:
+            send_socket.close()
+            logging.info("Socket closed")
+
 
 
 def parse_string_to_dict(input_string):
