@@ -10,7 +10,7 @@ from http.server import HTTPServer
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.9.1"
+version = "0.9.2"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -81,11 +81,6 @@ def listen_and_relay(resend_dest, resend_port):
             elif key in skip_list:
                 continue
             else:
-                try:
-                    value = float(value)
-                except ValueError:
-                    value = 0.0
-                    logging.warning("Non-numeric value for key {}: {}".format(key, value))
                 update_gauge("ecowitt_{}".format(key), float(value))
 
         if resend_bool:
@@ -124,7 +119,11 @@ def parse_string_to_dict(input_string):
 
     for pair in pairs:
         key, value = pair.split('=')
-        datapoints[key] = value
+        try:
+            datapoints[key] = float(value)
+        except ValueError:
+            datapoints[key] = 0.0
+            logging.warning("Non-numeric value for key {}: {}".format(key, value))
 
     return datapoints
 
