@@ -26,7 +26,7 @@ class TestEcowittBridge(unittest.TestCase):
     def test_update_gauge(self, mock_gauge):
         gauges = {}
         # Test creating a new gauge
-        update_gauge("new_metric", 123.45, gauges=gauges)
+        update_gauge("new_metric", 123.45)
         self.assertIn("new_metric", gauges)
         mock_gauge.assert_called_with("new_metric", 'ECOWITT data gauge')
         gauges["new_metric"].set.assert_called_with(123.45)
@@ -34,7 +34,7 @@ class TestEcowittBridge(unittest.TestCase):
         # Test updating an existing gauge
         mock_gauge.reset_mock()
         gauges["new_metric"].reset_mock()
-        update_gauge("new_metric", 543.21, gauges=gauges)
+        update_gauge("new_metric", 543.21)
         mock_gauge.assert_not_called() # Should not create a new one
         gauges["new_metric"].set.assert_called_with(543.21)
 
