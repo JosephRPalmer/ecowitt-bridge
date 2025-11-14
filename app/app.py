@@ -10,7 +10,7 @@ from http.server import HTTPServer
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.9.0"
+version = "0.9.1"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
