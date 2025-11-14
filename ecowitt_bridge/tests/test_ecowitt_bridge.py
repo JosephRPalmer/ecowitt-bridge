@@ -22,7 +22,7 @@ class TestEcowittBridge(unittest.TestCase):
         expected_dict_non_numeric = {'tempf': 70.0, 'stationtype': 0.0}
         self.assertEqual(parse_string_to_dict(input_str_with_non_numeric), expected_dict_non_numeric)
 
-    @patch('app.Gauge')
+    @patch('ecowitt_bridge.Gauge')
     def test_update_gauge(self, mock_gauge):
         gauges = {}
         # Test creating a new gauge
