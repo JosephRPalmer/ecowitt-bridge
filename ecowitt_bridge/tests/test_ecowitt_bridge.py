@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from ecowitt_bridge import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict, update_gauge
-
+from prometheus_client import Gauge
 
 class TestEcowittBridge(unittest.TestCase):
 
@@ -22,7 +22,7 @@ class TestEcowittBridge(unittest.TestCase):
         expected_dict_non_numeric = {'tempf': 70.0, 'stationtype': 0.0}
         self.assertEqual(parse_string_to_dict(input_str_with_non_numeric), expected_dict_non_numeric)
 
-    @patch('ecowitt_bridge.Gauge')
+    @patch('prometheus_client.Gauge')
     def test_update_gauge(self, mock_gauge):
         gauges = {}
         # Test creating a new gauge
