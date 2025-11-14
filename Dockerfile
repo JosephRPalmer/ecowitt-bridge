@@ -1,11 +1,11 @@
 FROM python:3.14-alpine
 
-WORKDIR /app
+WORKDIR /ecowitt-bridge
 
 COPY pyproject.toml .
 
 RUN pip install --no-cache-dir .
 
-COPY app /app
+COPY ecowitt-bridge /ecowitt-bridge
 
-CMD python app.py
+CMD python ecowitt-bridge.py
