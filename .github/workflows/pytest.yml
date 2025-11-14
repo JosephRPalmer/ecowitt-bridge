@@ -24,4 +24,4 @@ jobs:
           pip install -e .[test]
       - name: Test with pytest
         run: python -m pytest tests/
-        working-directory: ./ecowitt-bridge
+        working-directory: ./ecowitt_bridge
