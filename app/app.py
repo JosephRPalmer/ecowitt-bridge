@@ -81,7 +81,9 @@ def listen_and_relay(resend_dest, resend_port):
             elif key in skip_list:
                 continue
             else:
-                if isinstance(value, str):
+                try:
+                    value = float(value)
+                except ValueError:
                     value = 0.0
                     logging.warning("Non-numeric value for key {}: {}".format(key, value))
                 update_gauge("ecowitt_{}".format(key), float(value))
