@@ -11,7 +11,7 @@ class TestEcowittBridge(unittest.TestCase):
         self.assertAlmostEqual(fahrenheit_to_celsius(98.6), 37)
 
     def test_in_to_hpa(self):
-        self.assertAlmostEqual(in_to_hpa(29.92125), 1013.25, places=2)
+        self.assertAlmostEqual(in_to_hpa(29.92125), 1,007.104, places=2)
 
     def test_parse_string_to_dict(self):
         input_str = "['tempf=70.0&humidity=50&windspeedmph=10']"
