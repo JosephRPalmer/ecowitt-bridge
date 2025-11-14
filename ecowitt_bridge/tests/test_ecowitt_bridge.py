@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 from ecowitt_bridge import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict, update_gauge
 
 
-class TestApp(unittest.TestCase):
+class TestEcowittBridge(unittest.TestCase):
 
     def test_fahrenheit_to_celsius(self):
         self.assertAlmostEqual(fahrenheit_to_celsius(32), 0)
