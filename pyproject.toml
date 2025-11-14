@@ -1,0 +1,7 @@
+[project]
+name = "ecowitt-bridge"
+version = "0.9.0"
+description = "Ecowitt Event Bridge and Prometheus Exporter"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = ["prometheus-client>=0.23.1"]
