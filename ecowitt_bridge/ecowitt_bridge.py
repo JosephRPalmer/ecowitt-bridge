@@ -133,5 +133,6 @@ def update_gauge(key, value):
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
+    logging.info("Log level set to: {}".format(Settings().log_level))
     start_prometheus_server()
     listen_and_relay(Settings().resend_dest, Settings().resend_port, Settings().listen_port)
