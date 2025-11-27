@@ -11,9 +11,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from utils import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict
 from gauge_definitions import GaugeDefinitions
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-
 version = "0.9.4"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
@@ -28,6 +25,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
 
+logging.basicConfig(level=Settings().log_level if Settings().loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class PrometheusEndpointServer(threading.Thread):
