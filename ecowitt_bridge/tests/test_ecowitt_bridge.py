@@ -13,8 +13,7 @@ class TestEcowittBridge(unittest.TestCase):
     def test_in_to_hpa(self):
         self.assertAlmostEqual(in_to_hpa(29.92125), 1007.104, places=2)
 
-    @patch('utils.logging')
-    def test_parse_string_to_dict(self, mock_logging):
+    def test_parse_string_to_dict(self):
         mock_logger = MagicMock()
 
         input_str = "['tempf=70.0&humidity=50&windspeedmph=10']"
