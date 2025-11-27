@@ -22,10 +22,10 @@ class Settings(BaseSettings):
     resending: bool = True
     prom_port: int = 9110
     listen_port: int = 8082
-    log_level: str
+    loglevel: str = 'INFO'
 
 
-logging.basicConfig(level=Settings().log_level if Settings().log_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
+logging.basicConfig(level=Settings().loglevel if Settings().loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -133,6 +133,6 @@ def update_gauge(key, value):
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
-    logging.info("Log level set to: {}".format(Settings().log_level))
+    logging.info("Log level set to: {}".format(Settings().loglevel))
     start_prometheus_server()
     listen_and_relay(Settings().resend_dest, Settings().resend_port, Settings().listen_port)
