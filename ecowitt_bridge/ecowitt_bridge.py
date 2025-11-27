@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     resending: bool = True
     prom_port: int = 9110
     listen_port: int = 8082
-    log_level: str = "INFO"
+    log_level: str
 
 
 logging.basicConfig(level=Settings().log_level if Settings().log_level in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
