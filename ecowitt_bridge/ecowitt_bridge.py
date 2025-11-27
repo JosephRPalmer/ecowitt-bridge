@@ -4,20 +4,29 @@ import logging
 import os
 import socket
 import threading
-from datetime import datetime
 from http.server import HTTPServer
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+from utils import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict
+from gauge_definitions import GaugeDefinitions
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.9.2"
+version = "0.9.3"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
-resend_endpoint = os.environ.get('RESEND_DEST')
-resend_bool = os.getenv("RESENDING", 'False').lower() in ('true', '1', 't')
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict()
+    resend_dest: str = ""
+    resend_port: int = 8080
+    resending: bool = True
+    prom_port: int = 9110
+    listen_port: int = 8082
 
-prom_port = int(os.environ.get('PROM_PORT', 9110))
+
 
 
 class PrometheusEndpointServer(threading.Thread):
@@ -31,7 +40,7 @@ class PrometheusEndpointServer(threading.Thread):
 
 def start_prometheus_server():
     try:
-        httpd = HTTPServer(("0.0.0.0", prom_port), MetricsHandler)
+        httpd = HTTPServer(("0.0.0.0", Settings().prom_port), MetricsHandler)
     except (OSError, socket.error) as e:
         logging.error("Failed to start Prometheus server: %s", str(e))
         return
@@ -39,18 +48,17 @@ def start_prometheus_server():
     thread = PrometheusEndpointServer(httpd)
     thread.daemon = True
     thread.start()
-    logging.info("Exporting Prometheus /metrics/ on port %s", prom_port)
+    logging.info("Exporting Prometheus /metrics/ on port %s", Settings().prom_port)
 
 
-def listen_and_relay(resend_dest, resend_port):
+def listen_and_relay(resend_dest, resend_port, listen_port):
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    listen_port_final = os.environ.get('LISTEN_PORT', 8082)
-    listen_socket.bind(('0.0.0.0', int(listen_port_final)))
+    listen_socket.bind(('0.0.0.0', listen_port))
     listen_socket.listen(1)
 
     logging.info("Listening on port {} and resending to {}:{}".format(
-        listen_port_final, resend_dest, resend_port))
+        listen_port, resend_dest, resend_port))
 
     while True:
         client_socket, client_address = listen_socket.accept()
@@ -73,17 +81,17 @@ def listen_and_relay(resend_dest, resend_port):
             if key.startswith("temp") and key.endswith("f"):
                 celsius = fahrenheit_to_celsius(float(value))
                 key = key[:-1] + 'c'
-                update_gauge("ecowitt_{}".format(key), celsius)
+                update_gauge(key, celsius)
             elif key.startswith("barom") and key.endswith("in"):
                 hpa = in_to_hpa(float(value))
                 key = key[:-2] + 'hpa'
-                update_gauge("ecowitt_{}".format(key), hpa)
+                update_gauge(key, hpa)
             elif key in skip_list:
                 continue
             else:
-                update_gauge("ecowitt_{}".format(key), float(value))
+                update_gauge(key, float(value))
 
-        if resend_bool:
+        if Settings().resending:
             logging.info("Resending to: {}:{}".format(
                 resend_dest, resend_port))
             asyncio.run(resending_async(resend_dest, resend_port, received_data))
@@ -111,41 +119,14 @@ async def resending_async(resend_dest, resend_port, received_data):
             logging.info("Socket closed")
 
 
-
-def parse_string_to_dict(input_string):
-    datapoints = {}
-    pairs = input_string.replace("[", "").replace(
-        "'", "").replace("]", "").split('&')
-
-    for pair in pairs:
-        key, value = pair.split('=')
-        try:
-            datapoints[key] = float(value)
-        except ValueError:
-            datapoints[key] = 0.0
-            logging.warning("Non-numeric value for key {}: {}".format(key, value))
-
-    return datapoints
-
-
 def update_gauge(key, value):
+    key = "ecowitt_{}".format(key)
     if key not in gauges:
-        gauges[key] = Gauge(key, 'ECOWITT data gauge')
+        gauges[key] = Gauge(key, GaugeDefinitions[key].value if key in GaugeDefinitions else 'ECOWITT data gauge')
     gauges[key].set(value)
-
-
-def fahrenheit_to_celsius(fahrenheit):
-    celsius = (fahrenheit - 32) * 5 / 9
-    return celsius
-
-
-def in_to_hpa(ins):
-    hpa = ins * 33.6585
-    return hpa
 
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
     start_prometheus_server()
-    listen_and_relay(str(os.environ.get("RESEND_DEST")),
-                     int(os.environ.get("RESEND_PORT", 8080)))
+    listen_and_relay(Settings().resend_dest, Settings().resend_port, Settings().listen_port)
