@@ -1,6 +1,6 @@
 
 
-def parse_string_to_dict(input_string):
+def parse_string_to_dict(input_string, logger):
     datapoints = {}
     pairs = input_string.replace("[", "").replace(
         "'", "").replace("]", "").split('&')
@@ -11,7 +11,7 @@ def parse_string_to_dict(input_string):
             datapoints[key] = float(value)
         except ValueError:
             datapoints[key] = 0.0
-            logging.warning("Non-numeric value for key {}: {}".format(key, value))
+            logger.warning("Non-numeric value for key {}: {}".format(key, value))
 
     return datapoints
 
