@@ -11,10 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from utils import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict
 from gauge_definitions import GaugeDefinitions
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-
-version = "0.9.3"
+version = "0.9.4"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -25,9 +22,12 @@ class Settings(BaseSettings):
     resending: bool = True
     prom_port: int = 9110
     listen_port: int = 8082
+    loglevel: str = 'INFO'
 
+settings = Settings()
 
-
+logging.basicConfig(level=settings.loglevel if settings.loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 class PrometheusEndpointServer(threading.Thread):
     def __init__(self, httpd, *args, **kwargs):
@@ -40,7 +40,7 @@ class PrometheusEndpointServer(threading.Thread):
 
 def start_prometheus_server():
     try:
-        httpd = HTTPServer(("0.0.0.0", Settings().prom_port), MetricsHandler)
+        httpd = HTTPServer(("0.0.0.0", settings.prom_port), MetricsHandler)
     except (OSError, socket.error) as e:
         logging.error("Failed to start Prometheus server: %s", str(e))
         return
@@ -48,7 +48,7 @@ def start_prometheus_server():
     thread = PrometheusEndpointServer(httpd)
     thread.daemon = True
     thread.start()
-    logging.info("Exporting Prometheus /metrics/ on port %s", Settings().prom_port)
+    logging.info("Exporting Prometheus /metrics/ on port %s", settings.prom_port)
 
 
 def listen_and_relay(resend_dest, resend_port, listen_port):
@@ -72,12 +72,12 @@ def listen_and_relay(resend_dest, resend_port, listen_port):
 
         parsed_data = received_data_str.split('\n')
 
-        logging.info("Parsed data:")
+        logging.debug("Parsed data:")
         for line in parsed_data:
-            logging.info(line)
+            logging.debug(line)
 
-        for key, value in parse_string_to_dict(str(parsed_data[6:])).items():
-            logging.info("{}:{}".format(key, value))
+        for key, value in parse_string_to_dict(str(parsed_data[6:]), logging).items():
+            logging.debug("{}:{}".format(key, value))
             if key.startswith("temp") and key.endswith("f"):
                 celsius = fahrenheit_to_celsius(float(value))
                 key = key[:-1] + 'c'
@@ -91,7 +91,7 @@ def listen_and_relay(resend_dest, resend_port, listen_port):
             else:
                 update_gauge(key, float(value))
 
-        if Settings().resending:
+        if settings.resending:
             logging.info("Resending to: {}:{}".format(
                 resend_dest, resend_port))
             asyncio.run(resending_async(resend_dest, resend_port, received_data))
@@ -120,13 +120,15 @@ async def resending_async(resend_dest, resend_port, received_data):
 
 
 def update_gauge(key, value):
-    key = "ecowitt_{}".format(key)
-    if key not in gauges:
-        gauges[key] = Gauge(key, GaugeDefinitions[key].value if key in GaugeDefinitions else 'ECOWITT data gauge')
-    gauges[key].set(value)
+    final_key = "ecowitt_{}".format(key)
+    if final_key not in gauges:
+        description = GaugeDefinitions.get(key, 'ECOWITT data gauge')
+        gauges[final_key] = Gauge(final_key, description)
+    gauges[final_key].set(value)
 
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
+    logging.info("Log level set to: {}".format(getattr(settings, 'loglevel', 'INFO')))
     start_prometheus_server()
-    listen_and_relay(Settings().resend_dest, Settings().resend_port, Settings().listen_port)
+    listen_and_relay(settings.resend_dest, settings.resend_port, settings.listen_port)
