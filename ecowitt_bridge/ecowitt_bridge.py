@@ -122,11 +122,7 @@ async def resending_async(resend_dest, resend_port, received_data):
 def update_gauge(key, value):
     final_key = "ecowitt_{}".format(key)
     if final_key not in gauges:
-        if key in GaugeDefinitions:
-            description = GaugeDefinitions[key].value
-        else:
-            logging.debug(f"Key '{key}' not found in GaugeDefinitions, using default description.")
-            description = 'ECOWITT data gauge'
+        description = GaugeDefinitions.get(key, 'ECOWITT data gauge')
         gauges[final_key] = Gauge(final_key, description)
     gauges[final_key].set(value)
 
