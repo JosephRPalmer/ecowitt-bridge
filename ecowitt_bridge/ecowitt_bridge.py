@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logging.basicConfig(level=Settings().loglevel if Settings().loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
+logging.basicConfig(level=settings.loglevel if settings.loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'DEBUG',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
