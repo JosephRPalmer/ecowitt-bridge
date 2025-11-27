@@ -27,10 +27,6 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
-logging.basicConfig(level=settings.loglevel.upper() if settings.loglevel.upper() in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-
-
 class PrometheusEndpointServer(threading.Thread):
     def __init__(self, httpd, *args, **kwargs):
         self.httpd = httpd
@@ -134,7 +130,17 @@ def update_gauge(key, value):
 
 
 if __name__ == '__main__':
+    # Configure logging here after settings are loaded
+    log_level = settings.loglevel.upper()
+    if log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+        log_level = 'INFO'
+
+    logging.basicConfig(
+        level=getattr(logging, log_level),
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
-    logging.info("Log level set to: {}".format(settings.loglevel))
+    logging.info("Log level set to: {}".format(log_level))
     start_prometheus_server()
     listen_and_relay(settings.resend_dest, settings.resend_port, settings.listen_port)
