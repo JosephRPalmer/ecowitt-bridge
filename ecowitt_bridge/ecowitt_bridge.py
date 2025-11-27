@@ -20,7 +20,7 @@ skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict()
-    resend_dest: str
+    resend_dest: str = ""
     resend_port: int = 8080
     resending: bool = True
     prom_port: int = 9110
