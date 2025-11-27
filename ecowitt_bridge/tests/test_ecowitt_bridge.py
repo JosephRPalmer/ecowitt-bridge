@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from ecowitt_bridge import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict, update_gauge
+from utils import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict
 from prometheus_client import Gauge
 
 class TestEcowittBridge(unittest.TestCase):
