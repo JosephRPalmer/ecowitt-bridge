@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     listen_port: int = 8082
     loglevel: str = 'INFO'
 
+settings = Settings()
 
-logging.basicConfig(level=Settings().loglevel if Settings().loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
+
+logging.basicConfig(level=settings.loglevel if settings.loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
@@ -40,7 +42,7 @@ class PrometheusEndpointServer(threading.Thread):
 
 def start_prometheus_server():
     try:
-        httpd = HTTPServer(("0.0.0.0", Settings().prom_port), MetricsHandler)
+        httpd = HTTPServer(("0.0.0.0", settings.prom_port), MetricsHandler)
     except (OSError, socket.error) as e:
         logging.error("Failed to start Prometheus server: %s", str(e))
         return
@@ -48,7 +50,7 @@ def start_prometheus_server():
     thread = PrometheusEndpointServer(httpd)
     thread.daemon = True
     thread.start()
-    logging.info("Exporting Prometheus /metrics/ on port %s", Settings().prom_port)
+    logging.info("Exporting Prometheus /metrics/ on port %s", settings.prom_port)
 
 
 def listen_and_relay(resend_dest, resend_port, listen_port):
@@ -91,7 +93,7 @@ def listen_and_relay(resend_dest, resend_port, listen_port):
             else:
                 update_gauge(key, float(value))
 
-        if Settings().resending:
+        if settings.resending:
             logging.info("Resending to: {}:{}".format(
                 resend_dest, resend_port))
             asyncio.run(resending_async(resend_dest, resend_port, received_data))
@@ -133,6 +135,6 @@ def update_gauge(key, value):
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
-    logging.info("Log level set to: {}".format(Settings().loglevel))
+    logging.info("Log level set to: {}".format(settings.loglevel))
     start_prometheus_server()
-    listen_and_relay(Settings().resend_dest, Settings().resend_port, Settings().listen_port)
+    listen_and_relay(settings.resend_dest, settings.resend_port, settings.listen_port)
