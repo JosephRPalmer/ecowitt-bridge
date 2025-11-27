@@ -1,8 +1,4 @@
-import logging
 
-
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def parse_string_to_dict(input_string):
     datapoints = {}

@@ -26,9 +26,8 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logging.basicConfig(level=logging.WARN,
+logging.basicConfig(level=settings.loglevel if settings.loglevel in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] else 'INFO',
                     format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 class PrometheusEndpointServer(threading.Thread):
     def __init__(self, httpd, *args, **kwargs):
