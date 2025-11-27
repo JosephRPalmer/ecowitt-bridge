@@ -72,12 +72,12 @@ def listen_and_relay(resend_dest, resend_port, listen_port):
 
         parsed_data = received_data_str.split('\n')
 
-        logging.info("Parsed data:")
+        logging.debug("Parsed data:")
         for line in parsed_data:
-            logging.info(line)
+            logging.debug(line)
 
         for key, value in parse_string_to_dict(str(parsed_data[6:])).items():
-            logging.info("{}:{}".format(key, value))
+            logging.debug("{}:{}".format(key, value))
             if key.startswith("temp") and key.endswith("f"):
                 celsius = fahrenheit_to_celsius(float(value))
                 key = key[:-1] + 'c'
