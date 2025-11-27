@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-logging.basicConfig(level='DEBUG',
+logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 
