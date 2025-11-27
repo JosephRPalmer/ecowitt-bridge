@@ -120,20 +120,19 @@ async def resending_async(resend_dest, resend_port, received_data):
 
 
 def update_gauge(key, value):
-    key = "ecowitt_{}".format(key)
-    if key not in gauges:
+    final_key = "ecowitt_{}".format(key)
+    if final_key not in gauges:
         if key in GaugeDefinitions:
             description = GaugeDefinitions[key].value
         else:
             logging.debug(f"Key '{key}' not found in GaugeDefinitions, using default description.")
             description = 'ECOWITT data gauge'
-        gauges[key] = Gauge(key, description)
-    gauges[key].set(value)
+        gauges[final_key] = Gauge(final_key, description)
+    gauges[final_key].set(value)
 
 
 if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
     logging.info("Log level set to: {}".format(getattr(settings, 'loglevel', 'INFO')))
-    logging.debug("Debug logging is enabled.")
     start_prometheus_server()
     listen_and_relay(settings.resend_dest, settings.resend_port, settings.listen_port)
