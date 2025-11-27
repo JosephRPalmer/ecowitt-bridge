@@ -14,7 +14,7 @@ from gauge_definitions import GaugeDefinitions
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-version = "0.9.3"
+version = "0.9.4"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     resending: bool = True
     prom_port: int = 9110
     listen_port: int = 8082
+    log_level: str = "INFO"
 
 
 
@@ -122,7 +123,12 @@ async def resending_async(resend_dest, resend_port, received_data):
 def update_gauge(key, value):
     key = "ecowitt_{}".format(key)
     if key not in gauges:
-        gauges[key] = Gauge(key, GaugeDefinitions[key].value if key in GaugeDefinitions else 'ECOWITT data gauge')
+        if key in GaugeDefinitions:
+            description = GaugeDefinitions[key].value
+        else:
+            logging.debug(f"Key '{key}' not found in GaugeDefinitions, using default description.")
+            description = 'ECOWITT data gauge'
+        gauges[key] = Gauge(key, description)
     gauges[key].set(value)
 
 
