@@ -4,6 +4,7 @@ import logging
 import os
 import socket
 import threading
+import aiohttp
 from http.server import HTTPServer
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,7 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from utils import fahrenheit_to_celsius, in_to_hpa, parse_string_to_dict
 from gauge_definitions import GaugeDefinitions
 
-version = "0.9.4"
+version = "0.9.5"
 gauges = {}
 skip_list = ["PASSKEY", "stationtype", "dateutc", "freq", "runtime", "model"]
 
@@ -19,6 +20,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict()
     resend_dest: str = ""
     resend_port: int = 8080
+    resend_path: str = "/data"
     resending: bool = True
     prom_port: int = 9110
     listen_port: int = 8082
@@ -51,14 +53,14 @@ def start_prometheus_server():
     logging.info("Exporting Prometheus /metrics/ on port %s", settings.prom_port)
 
 
-def listen_and_relay(resend_dest, resend_port, listen_port):
+def listen_and_relay(resend_dest, resend_port, resend_path, listen_port):
     listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listen_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     listen_socket.bind(('0.0.0.0', listen_port))
     listen_socket.listen(1)
 
-    logging.info("Listening on port {} and resending to {}:{}".format(
-        listen_port, resend_dest, resend_port))
+    logging.info("Listening on port {} and resending to {}:{}{}".format(
+        listen_port, resend_dest, resend_port, resend_path))
 
     while True:
         client_socket, client_address = listen_socket.accept()
@@ -92,31 +94,28 @@ def listen_and_relay(resend_dest, resend_port, listen_port):
                 update_gauge(key, float(value))
 
         if settings.resending:
-            logging.info("Resending to: {}:{}".format(
-                resend_dest, resend_port))
-            asyncio.run(resending_async(resend_dest, resend_port, received_data))
+            logging.info("Resending to: {}:{}{}".format(
+                resend_dest, resend_port, resend_path))
+            asyncio.run(resending_async(resend_dest, resend_port, resend_path, received_data))
 
         client_socket.close()
 
-async def resending_async(resend_dest, resend_port, received_data):
+async def resending_async(resend_dest, resend_port, resend_path, received_data):
+    url = f"http://{resend_dest}:{resend_port}{resend_path}"
+    
     try:
-        send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        send_socket.connect((resend_dest, resend_port))
-        logging.info("Sending received data to %s:%s", resend_dest, resend_port)
-
-        send_socket.sendall(received_data)
-
-    except socket.error as e:
-        logging.error("Socket error: %s", str(e))
-
+        async with aiohttp.ClientSession() as session:
+            logging.info("Sending received data to %s", url)
+            async with session.post(url, data=received_data) as response:
+                if response.status == 200:
+                    logging.info("Data successfully sent to %s", url)
+                else:
+                    logging.warning("Received status %d from %s", response.status, url)
+                    
+    except aiohttp.ClientError as e:
+        logging.error("HTTP client error: %s", str(e))
     except Exception as e:
         logging.error("An unexpected error occurred: %s", str(e))
-
-    finally:
-        if send_socket:
-            send_socket.close()
-            logging.info("Socket closed")
 
 
 def update_gauge(key, value):
@@ -131,4 +130,4 @@ if __name__ == '__main__':
     logging.info("Ecowitt Eventbridge by JRP - Version {}".format(version))
     logging.info("Log level set to: {}".format(getattr(settings, 'loglevel', 'INFO')))
     start_prometheus_server()
-    listen_and_relay(settings.resend_dest, settings.resend_port, settings.listen_port)
+    listen_and_relay(settings.resend_dest, settings.resend_port, settings.resend_path, settings.listen_port)
