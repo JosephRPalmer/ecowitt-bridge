@@ -115,17 +115,25 @@ def extract_http_headers(received_data_str):
     
     return headers
 
+def extract_http_body(received_data_str):
+    """Extract the HTTP body (form data) from the incoming request"""
+    parts = received_data_str.split('\r\n\r\n', 1)
+    if len(parts) > 1:
+        return parts[1].encode('utf-8')
+    return b''
+
 async def resending_async(resend_dest, resend_port, resend_path, received_data, received_data_str):
     try:
         send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         send_socket.connect((resend_dest, resend_port))
         
-        # Extract headers from incoming request
+        # Extract headers and body from incoming request
         incoming_headers = extract_http_headers(received_data_str)
+        http_body = extract_http_body(received_data_str)
         
         # Build HTTP request with copied headers
-        content_length = len(received_data)
+        content_length = len(http_body)
         http_request_lines = [
             f"POST {resend_path} HTTP/1.1",
             f"Host: {resend_dest}:{resend_port}",
@@ -141,16 +149,16 @@ async def resending_async(resend_dest, resend_port, resend_path, received_data, 
             f"Content-Length: {content_length}",
             f"Connection: close",
             "",  # Empty line before body
-            ""
         ])
         
         http_request = "\r\n".join(http_request_lines).encode('utf-8')
         
         logging.info("Sending HTTP POST to %s:%s%s", resend_dest, resend_port, resend_path)
         logging.debug("Copied headers: %s", list(incoming_headers.keys()))
+        logging.debug("Body length: %d", len(http_body))
         
         # Send HTTP headers and body
-        send_socket.sendall(http_request + received_data)
+        send_socket.sendall(http_request + http_body)
         
         # Read response (optional, for logging)
         response = send_socket.recv(1024).decode('utf-8', errors='ignore')
