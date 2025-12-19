@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     resend_port: int = 8080
     resend_path: str = "/data"
     resending: bool = True
+    drop_keys: list = []  # Keys to drop from resending
     prom_port: int = 9110
     listen_port: int = 8082
     loglevel: str = 'INFO'
@@ -96,9 +97,39 @@ def listen_and_relay(resend_dest, resend_port, resend_path, listen_port):
         if settings.resending:
             logging.info("Resending to: {}:{}{}".format(
                 resend_dest, resend_port, resend_path))
-            asyncio.run(resending_async(resend_dest, resend_port, resend_path, received_data))
+            
+            # Filter data if drop_keys is configured
+            filtered_data = received_data
+            if settings.drop_keys:
+                filtered_data_str = filter_data_for_resending(received_data_str, settings.drop_keys)
+                filtered_data = filtered_data_str.encode('utf-8')
+                logging.debug("Filtered {} keys from resend data".format(len(settings.drop_keys)))
+            
+            asyncio.run(resending_async(resend_dest, resend_port, resend_path, filtered_data))
 
         client_socket.close()
+
+def filter_data_for_resending(data_str, drop_keys):
+    """Filter out specified key-value pairs from the data string"""
+    if not drop_keys:
+        return data_str
+    
+    lines = data_str.split('\n')
+    filtered_lines = []
+    
+    for line in lines:
+        # Skip lines that contain any of the drop keys
+        should_drop = False
+        for key in drop_keys:
+            if f"{key}=" in line:
+                should_drop = True
+                logging.debug("Dropping line containing key '{}': {}".format(key, line.strip()))
+                break
+        
+        if not should_drop:
+            filtered_lines.append(line)
+    
+    return '\n'.join(filtered_lines)
 
 async def resending_async(resend_dest, resend_port, resend_path, received_data):
     url = f"http://{resend_dest}:{resend_port}{resend_path}"
