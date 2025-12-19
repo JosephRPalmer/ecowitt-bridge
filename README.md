@@ -1,10 +1,11 @@
 # Ecowitt Bridge
 
-This python app creates an endpoint from which you can resend Ecowitt stats to Homebridge for use in Homekit but also presents you a Prometheus exporter endpoint.
+This python app creates an endpoint from which you can resend Ecowitt stats to Homebridge for use in Homekit or HomeAssistant but also presents you a Prometheus exporter endpoint.
 
 ## Working Items
 - Prometheus Exporter
 - Homebridge Forwarder
+- HomeAssistant Forwarder
 
 ## How To Use
 
@@ -16,6 +17,7 @@ This python app creates an endpoint from which you can resend Ecowitt stats to H
       - PROM_PORT=9110 (prometheus endpoint port)
       - RESEND_DEST (forwarding destination)
       - RESEND_PORT (forwarding port)
+      - RESEND_PATH (forwarding path)
       - RESENDING=1 (to make forwarding turn on
       - LOGLEVEL=DEBUG
 - Ensure the ports exposed in the docker compose match the ports referenced under LISTEN_PORT and PROM_PORT
