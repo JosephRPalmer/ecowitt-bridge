@@ -119,7 +119,9 @@ def extract_http_body(received_data_str):
     """Extract the HTTP body (form data) from the incoming request"""
     parts = received_data_str.split('\r\n\r\n', 1)
     if len(parts) > 1:
-        return parts[1].encode('utf-8')
+        # Remove any trailing newlines/carriage returns from the body
+        body = parts[1].strip()
+        return body.encode('utf-8')
     return b''
 
 async def resending_async(resend_dest, resend_port, resend_path, received_data, received_data_str):
@@ -147,15 +149,17 @@ async def resending_async(resend_dest, resend_port, resend_path, received_data, 
         # Add required headers
         http_request_lines.extend([
             f"Content-Length: {content_length}",
-            f"Connection: close",
-            "",  # Empty line before body
+            f"Connection: close"
         ])
         
-        http_request = "\r\n".join(http_request_lines).encode('utf-8')
+        # Join headers and add double CRLF before body
+        http_headers = "\r\n".join(http_request_lines) + "\r\n\r\n"
+        http_request = http_headers.encode('utf-8')
         
         logging.info("Sending HTTP POST to %s:%s%s", resend_dest, resend_port, resend_path)
         logging.debug("Copied headers: %s", list(incoming_headers.keys()))
         logging.debug("Body length: %d", len(http_body))
+        logging.debug("Body content: %s", http_body.decode('utf-8')[:100] + "..." if len(http_body) > 100 else http_body.decode('utf-8'))
         
         # Send HTTP headers and body
         send_socket.sendall(http_request + http_body)
