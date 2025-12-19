@@ -97,28 +97,57 @@ def listen_and_relay(resend_dest, resend_port, resend_path, listen_port):
         if settings.resending:
             logging.info("Resending to: {}:{}{}".format(
                 resend_dest, resend_port, resend_path))
-            asyncio.run(resending_async(resend_dest, resend_port, resend_path, received_data))
+            asyncio.run(resending_async(resend_dest, resend_port, resend_path, received_data, received_data_str))
 
         client_socket.close()
 
-async def resending_async(resend_dest, resend_port, resend_path, received_data):
+def extract_http_headers(received_data_str):
+    """Extract HTTP headers from incoming request data"""
+    lines = received_data_str.split('\r\n')
+    headers = {}
+    
+    for line in lines:
+        if ':' in line and not line.startswith('POST') and not line.startswith('GET'):
+            key, value = line.split(':', 1)
+            headers[key.strip()] = value.strip()
+        elif line == '':  # End of headers
+            break
+    
+    return headers
+
+async def resending_async(resend_dest, resend_port, resend_path, received_data, received_data_str):
     try:
         send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         send_socket.connect((resend_dest, resend_port))
         
-        # Construct HTTP POST request
+        # Extract headers from incoming request
+        incoming_headers = extract_http_headers(received_data_str)
+        
+        # Build HTTP request with copied headers
         content_length = len(received_data)
-        http_request = (
-            f"POST {resend_path} HTTP/1.1\r\n"
-            f"Host: {resend_dest}:{resend_port}\r\n"
-            f"Content-Type: application/octet-stream\r\n"
-            f"Content-Length: {content_length}\r\n"
-            f"Connection: close\r\n"
-            f"\r\n"
-        ).encode('utf-8')
+        http_request_lines = [
+            f"POST {resend_path} HTTP/1.1",
+            f"Host: {resend_dest}:{resend_port}",
+        ]
+        
+        # Copy relevant headers from incoming request
+        for header_name, header_value in incoming_headers.items():
+            if header_name.lower() not in ['host', 'content-length', 'connection']:
+                http_request_lines.append(f"{header_name}: {header_value}")
+        
+        # Add required headers
+        http_request_lines.extend([
+            f"Content-Length: {content_length}",
+            f"Connection: close",
+            "",  # Empty line before body
+            ""
+        ])
+        
+        http_request = "\r\n".join(http_request_lines).encode('utf-8')
         
         logging.info("Sending HTTP POST to %s:%s%s", resend_dest, resend_port, resend_path)
+        logging.debug("Copied headers: %s", list(incoming_headers.keys()))
         
         # Send HTTP headers and body
         send_socket.sendall(http_request + received_data)
