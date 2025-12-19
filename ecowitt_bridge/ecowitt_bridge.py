@@ -4,7 +4,6 @@ import logging
 import os
 import socket
 import threading
-import aiohttp
 from http.server import HTTPServer
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -103,21 +102,42 @@ def listen_and_relay(resend_dest, resend_port, resend_path, listen_port):
         client_socket.close()
 
 async def resending_async(resend_dest, resend_port, resend_path, received_data):
-    url = f"http://{resend_dest}:{resend_port}{resend_path}"
-    
     try:
-        async with aiohttp.ClientSession() as session:
-            logging.info("Sending received data to %s", url)
-            async with session.post(url, data=received_data) as response:
-                if response.status == 200:
-                    logging.info("Data successfully sent to %s", url)
-                else:
-                    logging.warning("Received status %d from %s", response.status, url)
-                    
-    except aiohttp.ClientError as e:
-        logging.error("HTTP client error: %s", str(e))
+        send_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        send_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        send_socket.connect((resend_dest, resend_port))
+        
+        # Construct HTTP POST request
+        content_length = len(received_data)
+        http_request = (
+            f"POST {resend_path} HTTP/1.1\r\n"
+            f"Host: {resend_dest}:{resend_port}\r\n"
+            f"Content-Type: application/octet-stream\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"Connection: close\r\n"
+            f"\r\n"
+        ).encode('utf-8')
+        
+        logging.info("Sending HTTP POST to %s:%s%s", resend_dest, resend_port, resend_path)
+        
+        # Send HTTP headers and body
+        send_socket.sendall(http_request + received_data)
+        
+        # Read response (optional, for logging)
+        response = send_socket.recv(1024).decode('utf-8', errors='ignore')
+        if "200 OK" in response:
+            logging.info("Data successfully sent via HTTP POST")
+        else:
+            logging.warning("Received response: %s", response.split('\r\n')[0])
+
+    except socket.error as e:
+        logging.error("Socket error: %s", str(e))
     except Exception as e:
         logging.error("An unexpected error occurred: %s", str(e))
+    finally:
+        if 'send_socket' in locals():
+            send_socket.close()
+            logging.debug("Socket closed")
 
 
 def update_gauge(key, value):
