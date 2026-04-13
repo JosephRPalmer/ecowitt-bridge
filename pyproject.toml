@@ -8,5 +8,5 @@ dependencies = [
     "asyncio>=4.0.0",
     "prometheus-client>=0.23.1",
     "pydantic-settings>=2.12.0",
-    "pytest>=9.0.1",
+    "pytest>=9.0.3",
 ]
